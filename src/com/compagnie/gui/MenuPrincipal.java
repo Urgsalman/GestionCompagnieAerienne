@@ -17,11 +17,12 @@ public class MenuPrincipal extends JFrame {
 
         JLabel titre = new JLabel("Sélectionnez la gestion à effectuer :", SwingConstants.CENTER);
         titre.setFont(new Font("Arial", Font.BOLD, 18));
-        titre.setForeground(new Color(40, 40, 40));
+        titre.setForeground(Color.BLACK); // Texte noir pour le thème clair de FlatLaf
 
         JButton btnPassager = new JButton(" Gérer les Passagers");
         JButton btnBillet = new JButton(" Gérer les Billets");
 
+        // Les couleurs de boutons Flat Design sont conservées
         Color blueFlight = new Color(0, 102, 204);
         Color greenTicket = new Color(76, 175, 80);
 

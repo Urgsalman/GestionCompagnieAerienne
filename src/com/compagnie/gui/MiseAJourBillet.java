@@ -10,7 +10,10 @@ import com.compagnie.models.StatutBillet;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -21,6 +24,7 @@ public class MiseAJourBillet extends JFrame {
     private BilletDAO billetDAO = new BilletDAO();
     private PassagerDAO passagerDAO = new PassagerDAO();
 
+    // Champs de Saisie
     private JTextField txtNumBillet = new JTextField(20);
     private JComboBox<PassagerComboItem> cbIdentifiantPassager = new JComboBox<>();
     private JTextField txtNumVol = new JTextField(15);
@@ -30,16 +34,23 @@ public class MiseAJourBillet extends JFrame {
     private JComboBox<StatutBillet> cbStatut = new JComboBox<>(StatutBillet.values());
     private JTextField txtDateEmission = new JTextField("AAAA-MM-JJ", 10);
 
+    // NOUVEAUX ÉLÉMENTS GUI pour l'affichage de la table
+    private JTable billetTable;
+    private BilletTableModel tableModel;
+
     public MiseAJourBillet() {
-        setTitle("Mise à jour Billet (CRUD) 🎟️");
+        setTitle("Mise à jour Billet (CRUD) et Affichage 🎟️");
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+        // MODIFICATION: Utilisation de BorderLayout pour intégrer la table
         setLayout(new BorderLayout(15, 15));
         setLocationRelativeTo(null);
         getRootPane().setBorder(new EmptyBorder(15, 15, 15, 15));
 
+        // --- 1. Panneau de Saisie (FORMULAIRE) ---
         JPanel formPanel = new JPanel(new GridLayout(8, 2, 10, 8));
         formPanel.setBorder(BorderFactory.createCompoundBorder(
-                new TitledBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY), "Détails du Billet"),
+                new TitledBorder(BorderFactory.createLineBorder(Color.GRAY), "Détails du Billet"),
                 new EmptyBorder(5, 5, 5, 5)
         ));
 
@@ -60,12 +71,14 @@ public class MiseAJourBillet extends JFrame {
         formPanel.add(new JLabel("Date Emission (AAAA-MM-JJ) :"));
         formPanel.add(txtDateEmission);
 
+        // --- 2. Panneau de Boutons ---
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         JButton btnAjouter = new JButton("Ajouter");
         JButton btnChercher = new JButton("Chercher");
         JButton btnModifier = new JButton("Modifier");
         JButton btnSupprimer = new JButton("Supprimer");
 
+        // Style des boutons
         btnAjouter.setBackground(new Color(50, 150, 50));
         btnAjouter.setForeground(Color.WHITE);
         btnModifier.setBackground(new Color(255, 193, 7));
@@ -80,18 +93,59 @@ public class MiseAJourBillet extends JFrame {
         buttonPanel.add(btnModifier);
         buttonPanel.add(btnSupprimer);
 
+        // Panneau de contrôle combiné (Formulaire + Boutons)
+        JPanel controlsPanel = new JPanel(new BorderLayout(0, 10));
+        controlsPanel.add(formPanel, BorderLayout.CENTER);
+        controlsPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+        // --- 3. JTable pour l'affichage (Nouvel ajout) ---
+        billetTable = new JTable();
+        billetTable.setFillsViewportHeight(true);
+        billetTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        billetTable.getTableHeader().setBackground(new Color(50, 50, 50));
+
+        JScrollPane scrollPane = new JScrollPane(billetTable);
+        scrollPane.setBorder(new TitledBorder("Liste des Billets Enregistrés (Cliquez pour éditer)"));
+
+        // Ajout de l'événement de sélection de ligne
+        billetTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int selectedRow = billetTable.getSelectedRow();
+                if (selectedRow != -1) {
+                    Billet b = tableModel.getBilletAt(billetTable.convertRowIndexToModel(selectedRow));
+                    fillFormWithBillet(b);
+                }
+            }
+        });
+
+        // --- 4. Ajout des composants à la fenêtre ---
+        add(controlsPanel, BorderLayout.NORTH); // Formulaire et boutons en haut
+        add(scrollPane, BorderLayout.CENTER);   // Table en bas
+
+        // --- 5. Initialisation et actions ---
+        loadPassagerComboBox();
+        loadBillets(); // Chargement initial des billets
+
         btnAjouter.addActionListener(e -> handleAjouter());
         btnChercher.addActionListener(e -> handleChercher());
         btnModifier.addActionListener(e -> handleModifier());
         btnSupprimer.addActionListener(e -> handleSupprimer());
 
-        loadPassagerComboBox();
-
-        add(formPanel, BorderLayout.CENTER);
-        add(buttonPanel, BorderLayout.SOUTH);
         pack();
+        setSize(1000, 650); // Taille ajustée pour le tableau
     }
 
+    // NOUVELLE MÉTHODE : Chargement/rafraîchissement des données de la table des Billets
+    private void loadBillets() {
+        try {
+            List<Billet> billets = billetDAO.listerTous();
+            tableModel = new BilletTableModel(billets);
+            billetTable.setModel(tableModel);
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Erreur lors du chargement des billets: " + ex.getMessage(), "Erreur BD", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
     private void loadPassagerComboBox() {
         cbIdentifiantPassager.removeAllItems();
@@ -115,6 +169,7 @@ public class MiseAJourBillet extends JFrame {
 
             if (billetDAO.ajouter(b)) {
                 JOptionPane.showMessageDialog(this, "Billet " + b.getNumBillet() + " ajouté avec succès.", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                loadBillets(); // Rafraîchissement
             } else {
                 JOptionPane.showMessageDialog(this, "Échec de l'ajout.", "Erreur BD", JOptionPane.ERROR_MESSAGE);
             }
@@ -149,6 +204,7 @@ public class MiseAJourBillet extends JFrame {
             Billet b = createBilletFromForm();
             if (billetDAO.modifier(b)) {
                 JOptionPane.showMessageDialog(this, "Billet " + b.getNumBillet() + " modifié avec succès.", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                loadBillets(); // Rafraîchissement
             } else {
                 JOptionPane.showMessageDialog(this, "Échec de la modification (Numéro Billet non trouvé ou erreur BD).", "Erreur BD", JOptionPane.ERROR_MESSAGE);
             }
@@ -171,6 +227,7 @@ public class MiseAJourBillet extends JFrame {
                 if (billetDAO.supprimer(numBillet)) {
                     JOptionPane.showMessageDialog(this, "Billet " + numBillet + " supprimé.", "Succès", JOptionPane.INFORMATION_MESSAGE);
                     clearForm();
+                    loadBillets(); // Rafraîchissement
                 } else {
                     JOptionPane.showMessageDialog(this, "Échec de la suppression (Numéro Billet non trouvé).", "Erreur BD", JOptionPane.ERROR_MESSAGE);
                 }
